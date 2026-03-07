@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Employee {
+  id        String     @id @default(uuid())
+  nama      String     @db.VarChar(100)
+  pin       String     @db.VarChar(10)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  records   HMRecord[]
+
+  @@map("employees")
+}
+
+model HMRecord {
+  id         String   @id @default(uuid())
+  employeeId String?
+  tanggal    DateTime
+  totalHM    Float
+  fotoPath   String   @db.VarChar(255)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("hm_records")
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  kodeUnit  String   @unique @db.VarChar(50)
+  namaUnit  String   @db.VarChar(100)
+  tipeUnit  String   @db.VarChar(50)
+  createdAt DateTime @default(now())
+
+  @@map("units")
+}

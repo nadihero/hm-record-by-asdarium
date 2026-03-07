@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HM Record
+
+Aplikasi pencatatan jam kerja operator (Hour Meter Record) untuk industri pertambangan. Dibangun dengan Next.js 16, TailwindCSS, dan Prisma.
+
+## Fitur
+
+### 📊 Dashboard
+- Statistik jam kerja periode aktif
+- Record terbaru dengan navigasi cepat
+- Tampilan iOS-style yang modern
+
+### 📷 Upload Timesheet
+- Upload foto timesheet
+- OCR otomatis untuk ekstraksi data
+- Validasi dan preview sebelum submit
+
+### 📈 Laporan
+- Rekap bulanan per operator
+- Galeri foto timesheet
+- Filter berdasarkan periode
+
+### 🚛 Hauler Management
+- CRUD truck/hauler dengan tag rute
+- Counter retase (+/-)
+- Activity log
+- Export resi ke WhatsApp
+
+### 👥 Admin Panel
+- Manajemen karyawan
+- Lihat semua record
+- Reset data
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: TailwindCSS 4
+- **Database**: MariaDB + Prisma ORM
+- **Icons**: Lucide React
+- **Language**: TypeScript
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- MariaDB/MySQL
 
+### Installation
+
+1. Clone repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/nadihero/hm-record-by-asdarium.git
+cd hm-record-by-asdarium
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Setup environment
+```bash
+cp .env.example .env
+# Edit .env dengan konfigurasi database Anda
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Setup database
+```bash
+npx prisma migrate deploy
+```
 
-## Learn More
+5. Run development server
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+├── app/
+│   ├── admin/          # Admin pages
+│   ├── api/            # API routes
+│   ├── hauler/         # Hauler management
+│   ├── login/          # Authentication
+│   ├── report/         # Reports
+│   └── upload/         # Upload timesheet
+├── components/         # Reusable components
+├── lib/                # Utilities & helpers
+├── prisma/             # Database schema
+└── uploads/            # Uploaded images
+```
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+DATABASE_HOST=localhost
+DATABASE_USER=root
+DATABASE_PASSWORD=your_password
+DATABASE_NAME=hm_record
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT

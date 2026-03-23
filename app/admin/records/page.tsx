@@ -47,9 +47,9 @@ export default function AdminRecordsPage() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('id-ID', { 
-      weekday: 'short', 
-      day: 'numeric', 
+    return date.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
       month: 'short',
       year: 'numeric'
     });
@@ -109,16 +109,22 @@ export default function AdminRecordsPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => setSelectedImage(record.fotoPath)}
+                    onClick={() => record.fotoPath && setSelectedImage(record.fotoPath)}
                     className="w-12 h-12 rounded-xl overflow-hidden bg-[var(--muted-bg)] flex-shrink-0 press-effect"
                   >
-                    <Image
-                      src={record.fotoPath}
-                      alt="Timesheet"
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                    />
+                    {record.fotoPath ? (
+                      <Image
+                        src={record.fotoPath}
+                        alt="Timesheet"
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Clock className="w-5 h-5 text-[var(--muted)]" />
+                      </div>
+                    )}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-medium text-[var(--foreground)]">

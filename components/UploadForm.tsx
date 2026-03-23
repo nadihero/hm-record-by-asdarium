@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
-import { Camera, ImagePlus, X, Check } from 'lucide-react';
+import { Camera, ImagePlus, X, Check, FileText } from 'lucide-react';
 import Image from 'next/image';
 import { getStoredUser } from '@/lib/auth';
 
@@ -12,6 +12,7 @@ interface UploadFormProps {
 export default function UploadForm({ onSuccess }: UploadFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [isManualMode, setIsManualMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [totalHM, setTotalHM] = useState('');
@@ -41,6 +42,7 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
   const clearSelection = () => {
     setSelectedFile(null);
     setPreview(null);
+    setIsManualMode(false);
     setTanggal(new Date().toISOString().split('T')[0]);
     setTotalHM('');
     setError(null);
@@ -49,15 +51,24 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
+  const handleManualMode = () => {
+    setIsManualMode(true);
+    setError(null);
+    setSuccess(false);
+  };
+
   const handleSubmit = async () => {
-    if (!selectedFile || !totalHM) return;
+    if (!totalHM) return;
+    if (!isManualMode && !selectedFile) return;
 
     setIsProcessing(true);
     setError(null);
 
     try {
       const submitData = new FormData();
-      submitData.append('file', selectedFile);
+      if (selectedFile) {
+        submitData.append('file', selectedFile);
+      }
       submitData.append('tanggal', tanggal);
       submitData.append('totalHM', totalHM);
       if (employeeId) {
@@ -87,7 +98,7 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
 
   return (
     <div className="space-y-4">
-      {!preview ? (
+      {!preview && !isManualMode ? (
         <div className="space-y-3">
           <input
             ref={fileInputRef}
@@ -138,26 +149,67 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
               </div>
             </div>
           </button>
+
+          {/* Manual Input Button */}
+          <button
+            type="button"
+            onClick={handleManualMode}
+            className="w-full p-5 rounded-2xl border-2 border-dashed border-black/10 hover:border-[var(--success)]/50 hover:bg-[var(--success)]/5 transition-all press-effect group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--success)]/10 flex items-center justify-center group-hover:bg-[var(--success)]/15 transition-colors">
+                <FileText className="w-5 h-5 text-[var(--success)]" />
+              </div>
+              <div className="text-left">
+                <p className="text-[15px] font-semibold text-[var(--foreground)]">Input Manual</p>
+                <p className="text-[13px] text-[var(--muted)]">Tambah record tanpa foto</p>
+              </div>
+            </div>
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Photo Preview */}
-          <div className="relative rounded-2xl overflow-hidden bg-black/5">
-            <Image
-              src={preview}
-              alt="Preview"
-              width={400}
-              height={300}
-              className="w-full h-auto object-cover"
-            />
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors press-effect"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Photo Preview - only show if there's a preview */}
+          {preview && (
+            <div className="relative rounded-2xl overflow-hidden bg-black/5">
+              <Image
+                src={preview}
+                alt="Preview"
+                width={400}
+                height={300}
+                className="w-full h-auto object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors press-effect"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Manual Mode Header */}
+          {isManualMode && !preview && (
+            <div className="flex items-center justify-between p-4 bg-[var(--success)]/10 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--success)]/20 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-[var(--success)]" />
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold text-[var(--foreground)]">Input Manual</p>
+                  <p className="text-[13px] text-[var(--muted)]">Tanpa foto</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="w-8 h-8 bg-black/10 text-[var(--muted)] rounded-full flex items-center justify-center hover:bg-black/20 transition-colors press-effect"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Form */}
           {!success && (

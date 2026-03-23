@@ -64,39 +64,46 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
 
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
     const tanggal = formData.get('tanggal') as string;
     const totalHM = parseFloat(formData.get('totalHM') as string);
     const employeeId = formData.get('employeeId') as string | null;
 
-    if (!file || !tanggal || isNaN(totalHM)) {
+    if (!tanggal || isNaN(totalHM)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Create uploads directory if not exists (outside public folder)
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
+    let fotoPath: string | null = null;
+
+    // Only process file if provided
+    if (file && file.size > 0) {
+      // Create uploads directory if not exists (outside public folder)
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
+
+      // Save file
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+
+      fotoPath = `/api/uploads/${fileName}`;
     }
 
-    // Save file
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = path.join(uploadsDir, fileName);
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
-
-    // Save to database - use API route for serving images
+    // Save to database
     const record = await prisma.hMRecord.create({
       data: {
         tanggal: new Date(tanggal),
         totalHM,
-        fotoPath: `/api/uploads/${fileName}`,
+        fotoPath: fotoPath || '',
         employeeId: employeeId || null,
       },
     });

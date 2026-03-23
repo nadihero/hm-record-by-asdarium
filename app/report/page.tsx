@@ -129,14 +129,20 @@ export default function ReportPage() {
                   key={record.id}
                   type="button"
                   className="relative aspect-square rounded-xl overflow-hidden group press-effect"
-                  onClick={() => setSelectedImage(record.fotoPath)}
+                  onClick={() => record.fotoPath && setSelectedImage(record.fotoPath)}
                 >
-                  <Image
-                    src={record.fotoPath}
-                    alt={`Timesheet ${formatDate(record.tanggal)}`}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-200"
-                  />
+                  {record.fotoPath ? (
+                    <Image
+                      src={record.fotoPath}
+                      alt={`Timesheet ${formatDate(record.tanggal)}`}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[var(--muted-bg)] flex items-center justify-center">
+                      <Clock className="w-8 h-8 text-[var(--muted)]" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute bottom-0 left-0 right-0 p-2 text-white text-center">
                     <p className="text-[11px] font-medium">{formatDate(record.tanggal)}</p>

@@ -10,12 +10,13 @@ datasource db {
 }
 
 model Employee {
-  id        String     @id @default(uuid())
-  nama      String     @db.VarChar(100)
-  pin       String     @db.VarChar(10)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String          @id @default(uuid())
+  nama      String          @db.VarChar(100)
+  pin       String          @db.VarChar(10)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
   records   HMRecord[]
+  absensi   AbsensiRecord[]
 
   @@map("employees")
 }
@@ -42,4 +43,21 @@ model Unit {
   createdAt DateTime @default(now())
 
   @@map("units")
+}
+
+model AbsensiRecord {
+  id         String   @id @default(uuid())
+  employeeId String
+  tanggal    DateTime @db.Date
+  jamMasuk   String?  @db.VarChar(5)
+  jamPulang  String?  @db.VarChar(5)
+  status     String   @db.VarChar(10)
+  keterangan String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, tanggal])
+  @@map("absensi_records")
 }

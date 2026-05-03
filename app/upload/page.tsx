@@ -1,4 +1,3 @@
-import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import UploadForm from "@/components/UploadForm";
 import { Lightbulb } from "lucide-react";
@@ -6,9 +5,7 @@ import { Lightbulb } from "lucide-react";
 export default function UploadPage() {
   return (
     <div className="flex flex-col min-h-screen pb-24">
-      <Header title="Upload" subtitle="Tambah record timesheet" showBack />
-
-      <div className="px-4 py-5 flex-1 space-y-4">
+      <div className="px-4 pt-12 pb-5 flex-1 space-y-4">
         <section className="card p-5">
           <UploadForm />
         </section>

@@ -2,14 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Camera, BarChart3, Truck, ClipboardCheck } from 'lucide-react';
+import { BarChart3, ClipboardCheck, Book } from 'lucide-react';
 
 const navItems = [
-  { href: '/', icon: Home, label: 'Beranda' },
-  { href: '/upload', icon: Camera, label: 'Upload' },
-  { href: '/absensi', icon: ClipboardCheck, label: 'Absensi' },
+  { href: '/', icon: ClipboardCheck, label: 'Absensi' },
+  { href: '/timesheet', icon: Book, label: 'Timesheet' },
   { href: '/report', icon: BarChart3, label: 'Laporan' },
-  { href: '/hauler', icon: Truck, label: 'Hauler' },
 ];
 
 export default function BottomNav() {
@@ -21,7 +19,7 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
       <div className="max-w-md mx-auto px-4 pb-2">
         <div className="bg-white/90 backdrop-blur-xl border border-black/5 rounded-2xl shadow-lg shadow-black/5">
-          <div className="grid grid-cols-5 gap-1 p-1">
+          <div className="grid grid-cols-3 gap-1 p-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (

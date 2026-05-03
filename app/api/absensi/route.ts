@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
       whereClause.employeeId = employeeId;
     }
 
-    if (month) {
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+
+    if (start && end) {
+      whereClause.tanggal = {
+        gte: new Date(start + 'T00:00:00'),
+        lte: new Date(end + 'T23:59:59'),
+      };
+    } else if (month) {
       const [year, monthNum] = month.split('-').map(Number);
       const startDate = new Date(year, monthNum - 1, 1);
       const endDate = new Date(year, monthNum, 0, 23, 59, 59);
@@ -27,14 +35,14 @@ export async function GET(request: NextRequest) {
 
     const absensi = all
       ? await prisma.absensiRecord.findMany({
-          where: whereClause,
-          orderBy: { tanggal: 'desc' },
-          include: { employee: { select: { id: true, nama: true } } },
-        })
+        where: whereClause,
+        orderBy: { tanggal: 'desc' },
+        include: { employee: { select: { id: true, nama: true } } },
+      })
       : await prisma.absensiRecord.findMany({
-          where: whereClause,
-          orderBy: { tanggal: 'desc' },
-        });
+        where: whereClause,
+        orderBy: { tanggal: 'desc' },
+      });
 
     return NextResponse.json(absensi);
   } catch (error) {
@@ -49,7 +57,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { employeeId, tanggal, jamMasuk, jamPulang, status, keterangan } = body;
+    const { employeeId, tanggal, jamMasuk, jamPulang, status, shift, keterangan } = body;
 
     if (!employeeId || !tanggal || !status) {
       return NextResponse.json(
@@ -59,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate status
-    const validStatus = ['hadir', 'alpa', 'sakit', 'cuti'];
+    const validStatus = ['hadir', 'izin', 'alpa', 'sakit', 'off'];
     if (!validStatus.includes(status)) {
       return NextResponse.json(
         { error: 'Invalid status' },
@@ -75,10 +83,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For 'sakit' and 'cuti', keterangan is required
-    if ((status === 'sakit' || status === 'cuti') && !keterangan) {
+    // For 'sakit' and 'izin', keterangan is required
+    if ((status === 'sakit' || status === 'izin') && !keterangan) {
       return NextResponse.json(
-        { error: 'Keterangan wajib diisi untuk status sakit/cuti' },
+        { error: 'Keterangan wajib diisi untuk status sakit/izin' },
         { status: 400 }
       );
     }
@@ -105,6 +113,7 @@ export async function POST(request: NextRequest) {
         jamMasuk: status === 'hadir' ? jamMasuk : null,
         jamPulang: status === 'hadir' ? jamPulang : null,
         status,
+        shift: status === 'hadir' ? (shift || null) : null,
         keterangan: keterangan || null,
       },
     });

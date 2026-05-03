@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { jamMasuk, jamPulang, status, keterangan } = body;
+    const { jamMasuk, jamPulang, status, shift, keterangan } = body;
 
     if (!status) {
       return NextResponse.json(
@@ -18,7 +18,7 @@ export async function PUT(
     }
 
     // Validate status
-    const validStatus = ['hadir', 'alpa', 'sakit', 'cuti'];
+    const validStatus = ['hadir', 'izin', 'alpa', 'sakit', 'off'];
     if (!validStatus.includes(status)) {
       return NextResponse.json(
         { error: 'Invalid status' },
@@ -34,10 +34,10 @@ export async function PUT(
       );
     }
 
-    // For 'sakit' and 'cuti', keterangan is required
-    if ((status === 'sakit' || status === 'cuti') && !keterangan) {
+    // For 'sakit' and 'izin', keterangan is required
+    if ((status === 'sakit' || status === 'izin') && !keterangan) {
       return NextResponse.json(
-        { error: 'Keterangan wajib diisi untuk status sakit/cuti' },
+        { error: 'Keterangan wajib diisi untuk status sakit/izin' },
         { status: 400 }
       );
     }
@@ -48,6 +48,7 @@ export async function PUT(
         jamMasuk: status === 'hadir' ? jamMasuk : null,
         jamPulang: status === 'hadir' ? jamPulang : null,
         status,
+        shift: status === 'hadir' ? (shift || null) : null,
         keterangan: keterangan || null,
       },
     });

@@ -52,6 +52,7 @@ model AbsensiRecord {
   jamMasuk   String?  @db.VarChar(5)
   jamPulang  String?  @db.VarChar(5)
   status     String   @db.VarChar(10)
+  shift      String?  @db.VarChar(2)
   keterangan String?  @db.Text
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

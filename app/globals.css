@@ -27,9 +27,9 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.47059;
-  letter-spacing: -0.022em;
+  font-family: var(--font-albert-sans), 'Albert Sans', system-ui, sans-serif;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
 }
 
 /* Card base */

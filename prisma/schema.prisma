@@ -35,16 +35,6 @@ model HMRecord {
   @@map("hm_records")
 }
 
-model Unit {
-  id        String   @id @default(uuid())
-  kodeUnit  String   @unique @db.VarChar(50)
-  namaUnit  String   @db.VarChar(100)
-  tipeUnit  String   @db.VarChar(50)
-  createdAt DateTime @default(now())
-
-  @@map("units")
-}
-
 model AbsensiRecord {
   id         String   @id @default(uuid())
   employeeId String

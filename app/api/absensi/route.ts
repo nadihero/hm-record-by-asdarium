@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { endOfDateOnly, parseDateOnly } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,13 +21,13 @@ export async function GET(request: NextRequest) {
 
     if (start && end) {
       whereClause.tanggal = {
-        gte: new Date(start + 'T00:00:00'),
-        lte: new Date(end + 'T23:59:59'),
+        gte: parseDateOnly(start),
+        lte: endOfDateOnly(end),
       };
     } else if (month) {
       const [year, monthNum] = month.split('-').map(Number);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0, 23, 59, 59);
+      const startDate = parseDateOnly(`${year}-${String(monthNum).padStart(2, '0')}-01`);
+      const endDate = endOfDateOnly(new Date(Date.UTC(year, monthNum, 0)));
       whereClause.tanggal = {
         gte: startDate,
         lte: endDate,
@@ -91,11 +92,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tanggalDate = parseDateOnly(tanggal);
+
     // Check for duplicate entry
     const existing = await prisma.absensiRecord.findFirst({
       where: {
         employeeId,
-        tanggal: new Date(tanggal),
+        tanggal: tanggalDate,
       },
     });
 
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
     const absensi = await prisma.absensiRecord.create({
       data: {
         employeeId,
-        tanggal: new Date(tanggal),
+        tanggal: tanggalDate,
         jamMasuk: status === 'hadir' ? jamMasuk : null,
         jamPulang: status === 'hadir' ? jamPulang : null,
         status,

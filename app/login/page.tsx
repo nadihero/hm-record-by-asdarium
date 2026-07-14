@@ -50,9 +50,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ background: 'var(--background)' }}>
       <div className="w-full max-w-sm">
         {/* Logo & Title */}
-        <div className="text-center mb-10">
-          <img src="/logo-cjtp.svg" alt="CJTP" className="w-40 h-auto object-contain mx-auto" />
-          <h1 className="text-[28px] font-bold tracking-tight text-[var(--foreground)]">HM Record</h1>
+        <div className="text-center mb-5">
+          <img src="/cjtp.webp" alt="CJTP" className="w-40 h-auto object-contain mx-auto" />
+          <h1 className="text-[18px] font-bold tracking-tight text-[var(--foreground)]">Ceria Jasa Tambang Pratama</h1>
         </div>
 
         {/* Login Card */}
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-[13px] text-[var(--muted)] mt-8">
-          Hubungi admin jika lupa PIN
+          &copy; {new Date().getFullYear()} <a href="https://wa.me/6282259680503" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">Asdarium</a>. All Rights Reserved.
         </p>
       </div>
     </div>

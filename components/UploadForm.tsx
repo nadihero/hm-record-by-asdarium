@@ -4,6 +4,12 @@ import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { Camera, ImagePlus, X, Check, FileText } from 'lucide-react';
 import Image from 'next/image';
 import { getStoredUser } from '@/lib/auth';
+import { toLocalDateString } from '@/lib/utils';
+import {
+  fetchWithRetry,
+  formatFileSize,
+  prepareImageForUpload,
+} from '@/lib/image';
 
 interface UploadFormProps {
   onSuccess?: () => void;
@@ -14,7 +20,8 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [isManualMode, setIsManualMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const [tanggal, setTanggal] = useState(() => toLocalDateString());
   const [totalHM, setTotalHM] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -29,24 +36,45 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
     }
   }, []);
 
-  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+  const revokePreview = (url: string | null) => {
+    if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+  };
+
+  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreview(URL.createObjectURL(file));
-      setError(null);
-      setSuccess(false);
+    if (!file) return;
+
+    setError(null);
+    setSuccess(false);
+    setStatusText('Mengompres gambar…');
+
+    try {
+      const prepared = await prepareImageForUpload(file);
+      revokePreview(preview);
+      setSelectedFile(prepared);
+      setPreview(URL.createObjectURL(prepared));
+      setIsManualMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memproses gambar');
+      setSelectedFile(null);
+      revokePreview(preview);
+      setPreview(null);
+    } finally {
+      setStatusText(null);
+      e.target.value = '';
     }
   };
 
   const clearSelection = () => {
+    revokePreview(preview);
     setSelectedFile(null);
     setPreview(null);
     setIsManualMode(false);
-    setTanggal(new Date().toISOString().split('T')[0]);
+    setTanggal(toLocalDateString());
     setTotalHM('');
     setError(null);
     setSuccess(false);
+    setStatusText(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
@@ -63,6 +91,7 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
 
     setIsProcessing(true);
     setError(null);
+    setStatusText(selectedFile ? 'Mengunggah…' : 'Menyimpan…');
 
     try {
       const submitData = new FormData();
@@ -75,22 +104,37 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
         submitData.append('employeeId', employeeId);
       }
 
-      const response = await fetch('/api/records', {
-        method: 'POST',
-        body: submitData,
-      });
+      const response = await fetchWithRetry(
+        '/api/records',
+        { method: 'POST', body: submitData },
+        {
+          maxAttempts: 4,
+          onRetry: ({ attempt, maxAttempts }) => {
+            setStatusText(
+              `Jaringan lambat, mencoba lagi (${attempt}/${maxAttempts - 1})…`
+            );
+          },
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Gagal menyimpan data');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan data');
       }
 
       setSuccess(true);
+      setStatusText(null);
       setTimeout(() => {
         clearSelection();
         onSuccess?.();
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Upload gagal. Periksa koneksi lalu coba lagi.'
+      );
+      setStatusText(null);
     } finally {
       setIsProcessing(false);
     }
@@ -120,7 +164,8 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full p-5 rounded-2xl border-2 border-dashed border-black/10 hover:border-[var(--primary)]/50 hover:bg-[var(--primary)]/5 transition-all press-effect group"
+            disabled={!!statusText}
+            className="w-full p-5 rounded-2xl border-2 border-dashed border-black/10 hover:border-[var(--primary)]/50 hover:bg-[var(--primary)]/5 transition-all press-effect group disabled:opacity-50"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/10 flex items-center justify-center group-hover:bg-[var(--primary)]/15 transition-colors">
@@ -128,7 +173,7 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
               </div>
               <div className="text-left">
                 <p className="text-[15px] font-semibold text-[var(--foreground)]">Ambil Foto</p>
-                <p className="text-[13px] text-[var(--muted)]">Buka kamera untuk foto baru</p>
+                <p className="text-[13px] text-[var(--muted)]">Otomatis dikompres (maks. 5 MB)</p>
               </div>
             </div>
           </button>
@@ -137,7 +182,8 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
           <button
             type="button"
             onClick={() => galleryInputRef.current?.click()}
-            className="w-full p-5 rounded-2xl border-2 border-dashed border-black/10 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 transition-all press-effect group"
+            disabled={!!statusText}
+            className="w-full p-5 rounded-2xl border-2 border-dashed border-black/10 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 transition-all press-effect group disabled:opacity-50"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center group-hover:bg-[var(--accent)]/15 transition-colors">
@@ -166,6 +212,13 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
               </div>
             </div>
           </button>
+
+          {statusText && (
+            <div className="flex items-center gap-3 p-4 bg-[var(--primary)]/10 rounded-xl">
+              <div className="w-5 h-5 border-2 border-[var(--primary)]/30 border-t-[var(--primary)] rounded-full animate-spin" />
+              <p className="text-[14px] font-medium text-[var(--primary)]">{statusText}</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -186,6 +239,11 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
               >
                 <X className="w-4 h-4" />
               </button>
+              {selectedFile && (
+                <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 text-white text-[11px] font-medium">
+                  {formatFileSize(selectedFile.size)}
+                </span>
+              )}
             </div>
           )}
 
@@ -247,6 +305,13 @@ export default function UploadForm({ onSuccess }: UploadFormProps) {
                   </div>
                 )}
               </div>
+
+              {statusText && isProcessing && (
+                <div className="flex items-center gap-3 p-3 bg-[var(--primary)]/10 rounded-xl">
+                  <div className="w-4 h-4 border-2 border-[var(--primary)]/30 border-t-[var(--primary)] rounded-full animate-spin" />
+                  <p className="text-[13px] font-medium text-[var(--primary)]">{statusText}</p>
+                </div>
+              )}
 
               <button
                 type="button"

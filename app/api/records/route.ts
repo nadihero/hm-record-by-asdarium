@@ -4,6 +4,17 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { prisma } from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
+import { endOfDateOnly, parseDateOnly } from '@/lib/utils';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_MIME = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/octet-stream', // some mobile cameras
+]);
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,18 +33,17 @@ export async function GET(request: NextRequest) {
       whereClause.employeeId = employeeId;
     }
 
-    // Date range filters
+    // Date range filters — parse as calendar dates (UTC midnight..end of day)
     if (start && end) {
-      const startDate = new Date(start);
-      const endDate = new Date(end);
       whereClause.tanggal = {
-        gte: startDate,
-        lte: endDate,
+        gte: parseDateOnly(start),
+        lte: endOfDateOnly(end),
       };
     } else if (month) {
       const [year, monthNum] = month.split('-').map(Number);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0, 23, 59, 59);
+      const startDate = parseDateOnly(`${year}-${String(monthNum).padStart(2, '0')}-01`);
+      // Last day of month: day 0 of next month
+      const endDate = endOfDateOnly(new Date(Date.UTC(year, monthNum, 0)));
       whereClause.tanggal = {
         gte: startDate,
         lte: endDate,
@@ -76,19 +86,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (totalHM < 0) {
+      return NextResponse.json(
+        { error: 'Total HM tidak boleh negatif' },
+        { status: 400 }
+      );
+    }
+
     let fotoPath: string | null = null;
 
     // Only process file if provided
     if (file && file.size > 0) {
+      if (file.size > MAX_IMAGE_BYTES) {
+        return NextResponse.json(
+          { error: 'Ukuran gambar maksimal 5 MB. Kompres dulu sebelum upload.' },
+          { status: 413 }
+        );
+      }
+
+      if (file.type && !ALLOWED_MIME.has(file.type) && !file.type.startsWith('image/')) {
+        return NextResponse.json(
+          { error: 'File harus berupa gambar' },
+          { status: 400 }
+        );
+      }
+
       // Create uploads directory if not exists (outside public folder)
       const uploadsDir = path.join(process.cwd(), 'uploads');
       if (!existsSync(uploadsDir)) {
         await mkdir(uploadsDir, { recursive: true });
       }
 
-      // Save file
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${uuidv4()}.${fileExt}`;
+      // Always store as uuid + safe extension
+      const rawExt = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const fileExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
+      const fileName = `${uuidv4()}.${fileExt === 'jpeg' ? 'jpg' : fileExt}`;
       const filePath = path.join(uploadsDir, fileName);
 
       const bytes = await file.arrayBuffer();
@@ -98,10 +130,10 @@ export async function POST(request: NextRequest) {
       fotoPath = `/api/uploads/${fileName}`;
     }
 
-    // Save to database
+    // Save to database (calendar date → UTC midnight, no local offset shift)
     const record = await prisma.hMRecord.create({
       data: {
-        tanggal: new Date(tanggal),
+        tanggal: parseDateOnly(tanggal),
         totalHM,
         fotoPath: fotoPath || '',
         employeeId: employeeId || null,

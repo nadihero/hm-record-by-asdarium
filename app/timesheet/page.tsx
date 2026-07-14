@@ -6,6 +6,12 @@ import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
 import { Camera, BarChart3, Clock, ChevronRight, FileText, LogOut } from "lucide-react";
 import { getStoredUser, clearStoredUser, AuthUser } from '@/lib/auth';
+import {
+  formatDateMedium,
+  formatWorkPeriodLabel,
+  getActiveWorkPeriod,
+  toLocalDateString,
+} from '@/lib/utils';
 
 interface HMRecord {
   id: string;
@@ -37,25 +43,11 @@ export default function Dashboard() {
 
   const fetchRecords = async (employeeId: string) => {
     try {
-      const today = new Date();
-      let startMonth, startYear, endMonth, endYear;
+      const { startDate, endDate } = getActiveWorkPeriod();
+      const startStr = toLocalDateString(startDate);
+      const endStr = toLocalDateString(endDate);
 
-      if (today.getDate() >= 19) {
-        startMonth = today.getMonth();
-        startYear = today.getFullYear();
-        endMonth = today.getMonth() + 1;
-        endYear = today.getFullYear();
-      } else {
-        startMonth = today.getMonth() - 1;
-        startYear = today.getFullYear();
-        endMonth = today.getMonth();
-        endYear = today.getFullYear();
-      }
-
-      const startDate = new Date(startYear, startMonth, 19);
-      const endDate = new Date(endYear, endMonth, 18, 23, 59, 59);
-
-      const response = await fetch(`/api/records?start=${startDate.toISOString()}&end=${endDate.toISOString()}&employeeId=${employeeId}`);
+      const response = await fetch(`/api/records?start=${startStr}&end=${endStr}&employeeId=${employeeId}`);
       if (response.ok) {
         const data = await response.json();
         setRecords(data);
@@ -70,25 +62,8 @@ export default function Dashboard() {
   const totalHM = records.reduce((sum, r) => sum + r.totalHM, 0);
 
   const getPeriodDisplay = () => {
-    const today = new Date();
-    let startMonth, startYear, endMonth, endYear;
-
-    if (today.getDate() >= 19) {
-      startMonth = today.getMonth();
-      startYear = today.getFullYear();
-      endMonth = today.getMonth() + 1;
-      endYear = today.getFullYear();
-    } else {
-      startMonth = today.getMonth() - 1;
-      startYear = today.getFullYear();
-      endMonth = today.getMonth();
-      endYear = today.getFullYear();
-    }
-
-    const startDate = new Date(startYear, startMonth, 19);
-    const endDate = new Date(endYear, endMonth, 18);
-
-    return `${startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – ${endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    const { startDate, endDate } = getActiveWorkPeriod();
+    return formatWorkPeriodLabel(startDate, endDate);
   };
 
   const getGreeting = () => {
@@ -216,7 +191,7 @@ export default function Dashboard() {
                       <Clock className="w-4 h-4 text-[var(--muted)]" />
                     </div>
                     <span className="text-[15px] text-[var(--foreground)]">
-                      {new Date(record.tanggal).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {formatDateMedium(record.tanggal)}
                     </span>
                   </div>
                   <span className="text-[15px] font-semibold text-[var(--primary)]">{record.totalHM} jam</span>

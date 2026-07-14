@@ -5,6 +5,29 @@ import { useRouter } from 'next/navigation';
 import BottomNav from "@/components/BottomNav";
 import { ChevronLeft, ChevronRight, X, Check } from "lucide-react";
 import { getStoredUser } from '@/lib/auth';
+import {
+  defaultHoursForShift,
+  formatDateLong,
+  formatJamId,
+  formatWorkPeriodLabel,
+  getActiveWorkPeriod,
+  getWorkPeriodByEndMonth,
+  isValidWorkHours,
+  jamOptions24,
+  resolveHoursForPopup,
+  toDateOnlyString,
+  toLocalDateString,
+  type ShiftKey,
+} from '@/lib/utils';
+
+const SHIFT_OPTIONS = [
+  { key: 'D' as const, emoji: '', label: 'Siang', isNight: false },
+  { key: 'N' as const, emoji: '', label: 'Malam', isNight: true },
+  { key: 'D7' as const, emoji: '', label: 'D7', isNight: false },
+  { key: 'N7' as const, emoji: '', label: 'N7', isNight: true },
+];
+
+const JAM_OPTIONS = jamOptions24(60);
 
 interface AbsensiRecord {
   id: string;
@@ -33,19 +56,14 @@ const STATUS_CONFIG: Record<StatusType, { label: string; bg: string; text: strin
 
 const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
-function toLocalDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 export default function AbsensiPage() {
   const router = useRouter();
   const today = toLocalDateString(new Date());
+  const activePeriod = getActiveWorkPeriod();
 
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  // currentMonth/Year = end month of work period (18th), same as report/timesheet
+  const [currentYear, setCurrentYear] = useState(activePeriod.endDate.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(activePeriod.endDate.getMonth());
   const [records, setRecords] = useState<AbsensiRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,9 +71,9 @@ export default function AbsensiPage() {
 
   const [popup, setPopup] = useState<DayPopup | null>(null);
   const [popupStatus, setPopupStatus] = useState<StatusType>('hadir');
-  const [popupJamMasuk, setPopupJamMasuk] = useState('08:00');
-  const [popupJamPulang, setPopupJamPulang] = useState('17:00');
-  const [popupShift, setPopupShift] = useState<'D' | 'N' | 'D7' | 'N7' | null>(null);
+  const [popupJamMasuk, setPopupJamMasuk] = useState('07:00');
+  const [popupJamPulang, setPopupJamPulang] = useState('19:00');
+  const [popupShift, setPopupShift] = useState<ShiftKey | null>('D');
   const [popupKeterangan, setPopupKeterangan] = useState('');
   const [popupError, setPopupError] = useState('');
 
@@ -66,11 +84,9 @@ export default function AbsensiPage() {
     setEmployeeId(user.id);
   }, [router]);
 
-  // Period: 19th of prev month → 18th of currentMonth/currentYear
+  // Period: 19 (endMonth-1) → 18 endMonth — shared helper
   const getPeriodRange = useCallback(() => {
-    const endDate = new Date(currentYear, currentMonth, 18);
-    const startDate = new Date(currentYear, currentMonth - 1, 19);
-    return { startDate, endDate };
+    return getWorkPeriodByEndMonth(currentYear, currentMonth);
   }, [currentYear, currentMonth]);
 
   const fetchRecords = useCallback(async () => {
@@ -111,14 +127,10 @@ export default function AbsensiPage() {
 
   const recordMap = new Map<string, AbsensiRecord>();
   records.forEach(r => {
-    recordMap.set(toLocalDateString(new Date(r.tanggal)), r);
+    recordMap.set(toDateOnlyString(r.tanggal), r);
   });
 
-  const getPeriodLabel = () => {
-    const start = startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-    const end = endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-    return `${start} – ${end}`;
-  };
+  const getPeriodLabel = () => formatWorkPeriodLabel(startDate, endDate);
 
   const prevPeriod = () => {
     if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); }
@@ -130,13 +142,31 @@ export default function AbsensiPage() {
     else setCurrentMonth(m => m + 1);
   };
 
+  const applyShiftHours = (shift: ShiftKey) => {
+    const { jamMasuk, jamPulang } = defaultHoursForShift(shift);
+    setPopupJamMasuk(jamMasuk);
+    setPopupJamPulang(jamPulang);
+  };
+
+  const handleShiftChange = (shift: ShiftKey) => {
+    setPopupShift(shift);
+    applyShiftHours(shift);
+  };
+
   const openPopup = (dateStr: string) => {
     const existing = recordMap.get(dateStr) ?? null;
+    const shift = (existing?.shift as ShiftKey | null) ?? 'D';
+    // New day / legacy 08:00–17:00 → pakai default shift (07–19 / 19–07)
+    const hours = resolveHoursForPopup(
+      existing?.jamMasuk,
+      existing?.jamPulang,
+      shift
+    );
     setPopup({ date: dateStr, existing });
     setPopupStatus((existing?.status as StatusType) ?? 'hadir');
-    setPopupShift((existing?.shift as 'D' | 'N' | 'D7' | 'N7' | null) ?? 'D');
-    setPopupJamMasuk(existing?.jamMasuk ?? '08:00');
-    setPopupJamPulang(existing?.jamPulang ?? '17:00');
+    setPopupShift(shift);
+    setPopupJamMasuk(hours.jamMasuk);
+    setPopupJamPulang(hours.jamPulang);
     setPopupKeterangan(existing?.keterangan ?? '');
     setPopupError('');
   };
@@ -149,8 +179,8 @@ export default function AbsensiPage() {
     if (popupStatus === 'hadir' && (!popupJamMasuk || !popupJamPulang)) {
       setPopupError('Jam masuk & pulang wajib diisi'); return;
     }
-    if (popupStatus === 'hadir' && popupJamPulang <= popupJamMasuk) {
-      setPopupError('Jam pulang harus setelah jam masuk'); return;
+    if (popupStatus === 'hadir' && !isValidWorkHours(popupJamMasuk, popupJamPulang, popupShift)) {
+      setPopupError('Jam masuk dan pulang tidak valid'); return;
     }
     if ((popupStatus === 'sakit' || popupStatus === 'izin') && !popupKeterangan.trim()) {
       setPopupError('Keterangan wajib diisi'); return;
@@ -210,10 +240,7 @@ export default function AbsensiPage() {
   };
   const presentase = records.length > 0 ? Math.round((stats.hadir / records.length) * 100) : 0;
 
-  const formatPopupDate = (dateStr: string) =>
-    new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    });
+  const formatPopupDate = (dateStr: string) => formatDateLong(dateStr);
 
   return (
     <div className="flex flex-col min-h-screen pb-24 bg-[var(--bg)]">
@@ -423,20 +450,15 @@ export default function AbsensiPage() {
             {/* Shift + Time – Hadir only */}
             {popupStatus === 'hadir' && (
               <div className="space-y-3">
-                {/* Shift toggle */}
+                {/* Shift toggle — auto-sets jam */}
                 <div>
                   <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Shift</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { key: 'D', emoji: '☀️', label: 'Siang', isNight: false },
-                      { key: 'N', emoji: '🌙', label: 'Malam', isNight: true },
-                      { key: 'D7', emoji: '☀️', label: 'Siang 7', isNight: false },
-                      { key: 'N7', emoji: '🌙', label: 'Malam 7', isNight: true },
-                    ] as const).map(({ key, emoji, label, isNight }) => (
+                    {SHIFT_OPTIONS.map(({ key, emoji, label, isNight }) => (
                       <button
                         key={key}
                         type="button"
-                        onClick={() => setPopupShift(key)}
+                        onClick={() => handleShiftChange(key)}
                         className="h-11 rounded-xl text-[13px] font-bold transition-all press-effect flex items-center justify-center gap-1.5"
                         style={{
                           backgroundColor: popupShift === key
@@ -455,22 +477,61 @@ export default function AbsensiPage() {
                       </button>
                     ))}
                   </div>
+                  <p className="text-[12px] text-[var(--muted)] mt-2 text-center">
+                    {popupShift?.startsWith('N')
+                      ? 'Shift malam: 19.00 malam → 07.00 pagi'
+                      : 'Shift siang: 07.00 pagi → 19.00 malam'}
+                  </p>
                 </div>
-                {/* Time inputs */}
+
+                {/* Ringkasan jam (tanpa AM/PM) */}
+                <div className="rounded-xl bg-[var(--muted-bg)] px-4 py-3 text-center">
+                  <p className="text-[11px] font-medium text-[var(--muted)] uppercase tracking-wide">Jam kerja</p>
+                  <p className="text-[15px] font-semibold text-[var(--foreground)] mt-1">
+                    {formatJamId(popupJamMasuk)}
+                    <span className="text-[var(--muted)] font-normal mx-1.5">→</span>
+                    {formatJamId(popupJamPulang)}
+                  </p>
+                  {popupShift?.startsWith('N') && (
+                    <p className="text-[11px] text-[var(--muted)] mt-1">Lembur melewati tengah malam</p>
+                  )}
+                </div>
+
+                {/* Time selects 24 jam (bukan type=time AM/PM) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">
                       Jam Masuk <span className="text-[var(--error)]">*</span>
                     </label>
-                    <input type="time" value={popupJamMasuk} onChange={e => setPopupJamMasuk(e.target.value)}
-                      className="w-full h-11 px-3 bg-[var(--muted-bg)] border-0 rounded-xl text-[16px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow" />
+                    <select
+                      value={popupJamMasuk}
+                      onChange={e => setPopupJamMasuk(e.target.value)}
+                      className="w-full h-11 px-3 bg-[var(--muted-bg)] border-0 rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow appearance-none"
+                    >
+                      {!JAM_OPTIONS.includes(popupJamMasuk) && (
+                        <option value={popupJamMasuk}>{formatJamId(popupJamMasuk)}</option>
+                      )}
+                      {JAM_OPTIONS.map(t => (
+                        <option key={`in-${t}`} value={t}>{formatJamId(t)}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">
                       Jam Pulang <span className="text-[var(--error)]">*</span>
                     </label>
-                    <input type="time" value={popupJamPulang} onChange={e => setPopupJamPulang(e.target.value)}
-                      className="w-full h-11 px-3 bg-[var(--muted-bg)] border-0 rounded-xl text-[16px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow" />
+                    <select
+                      value={popupJamPulang}
+                      onChange={e => setPopupJamPulang(e.target.value)}
+                      className="w-full h-11 px-3 bg-[var(--muted-bg)] border-0 rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow appearance-none"
+                    >
+                      {!JAM_OPTIONS.includes(popupJamPulang) && (
+                        <option value={popupJamPulang}>{formatJamId(popupJamPulang)}</option>
+                      )}
+                      {JAM_OPTIONS.map(t => (
+                        <option key={`out-${t}`} value={t}>{formatJamId(t)}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

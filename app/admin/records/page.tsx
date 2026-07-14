@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Clock, X, User } from 'lucide-react';
 import { getStoredUser, isAdmin } from '@/lib/auth';
+import { formatDateMedium } from '@/lib/utils';
 
 interface HMRecord {
   id: string;
@@ -43,16 +44,6 @@ export default function AdminRecordsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('id-ID', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
   };
 
   const totalHM = records.reduce((sum, r) => sum + r.totalHM, 0);
@@ -128,7 +119,7 @@ export default function AdminRecordsPage() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-medium text-[var(--foreground)]">
-                      {formatDate(record.tanggal)}
+                      {formatDateMedium(record.tanggal)}
                     </p>
                     <div className="flex items-center gap-1 mt-0.5">
                       <User className="w-3 h-3 text-[var(--muted)]" />

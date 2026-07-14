@@ -10,20 +10,18 @@ Aplikasi pencatatan jam kerja operator (Hour Meter Record) untuk industri pertam
 - Tampilan iOS-style yang modern
 
 ### 📷 Upload Timesheet
-- Upload foto timesheet
-- OCR otomatis untuk ekstraksi data
-- Validasi dan preview sebelum submit
+- Upload foto timesheet (kompres otomatis, maks. 5 MB)
+- Retry upload saat jaringan lambat
+- Input manual tanpa foto
 
 ### 📈 Laporan
-- Rekap bulanan per operator
-- Galeri foto timesheet
+- Rekap periode kerja (19 → 18)
+- Galeri foto timesheet + edit/hapus (tekan lama)
 - Filter berdasarkan periode
 
-### 🚛 Hauler Management
-- CRUD truck/hauler dengan tag rute
-- Counter retase (+/-)
-- Activity log
-- Export resi ke WhatsApp
+### ✅ Absensi
+- Kalender periode kerja
+- Shift siang/malam dengan jam otomatis
 
 ### 👥 Admin Panel
 - Manajemen karyawan
@@ -81,9 +79,9 @@ Open [http://localhost:3000](http://localhost:3000)
 ├── app/
 │   ├── admin/          # Admin pages
 │   ├── api/            # API routes
-│   ├── hauler/         # Hauler management
 │   ├── login/          # Authentication
 │   ├── report/         # Reports
+│   ├── timesheet/      # Dashboard employee
 │   └── upload/         # Upload timesheet
 ├── components/         # Reusable components
 ├── lib/                # Utilities & helpers

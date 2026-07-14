@@ -10,13 +10,14 @@ datasource db {
 }
 
 model Employee {
-  id        String          @id @default(uuid())
-  nama      String          @db.VarChar(100)
-  pin       String          @db.VarChar(10)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  records   HMRecord[]
-  absensi   AbsensiRecord[]
+  id         String          @id @default(uuid())
+  nama       String          @db.VarChar(100)
+  pin        String          @db.VarChar(10)
+  fotoProfil String?         @db.VarChar(255)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  records    HMRecord[]
+  absensi    AbsensiRecord[]
 
   @@map("employees")
 }

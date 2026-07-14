@@ -2,6 +2,8 @@
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 const MAX_DIMENSION = 1920;
+/** Smaller default for profile avatars */
+const PROFILE_MAX_DIMENSION = 512;
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 export function formatFileSize(bytes: number): string {
@@ -45,11 +47,14 @@ function canvasToBlob(
 
 /**
  * Compress / resize image for reliable upload on slow networks.
- * - Max side 1920px
+ * - Max side 1920px (or smaller for profile)
  * - Prefer JPEG (smaller)
  * - Target under MAX_IMAGE_BYTES (5MB)
  */
-export async function prepareImageForUpload(file: File): Promise<File> {
+export async function prepareImageForUpload(
+  file: File,
+  options?: { maxDimension?: number; baseName?: string }
+): Promise<File> {
   if (!file.type.startsWith('image/') && !ALLOWED_TYPES.includes(file.type.toLowerCase())) {
     // Some browsers leave type empty for camera captures
     if (file.type && !file.type.startsWith('image/')) {
@@ -57,10 +62,11 @@ export async function prepareImageForUpload(file: File): Promise<File> {
     }
   }
 
-  // Already small enough and not huge dimensions — still re-encode large originals
+  const maxDim = options?.maxDimension ?? MAX_DIMENSION;
+
   try {
     const img = await loadImageFromFile(file);
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
     const width = Math.max(1, Math.round(img.width * scale));
     const height = Math.max(1, Math.round(img.height * scale));
 
@@ -71,7 +77,6 @@ export async function prepareImageForUpload(file: File): Promise<File> {
     if (!ctx) throw new Error('Browser tidak mendukung kompresi gambar');
     ctx.drawImage(img, 0, 0, width, height);
 
-    // Progressive quality until under 5MB
     let quality = 0.82;
     let blob = await canvasToBlob(canvas, 'image/jpeg', quality);
     while (blob.size > MAX_IMAGE_BYTES && quality > 0.35) {
@@ -79,7 +84,6 @@ export async function prepareImageForUpload(file: File): Promise<File> {
       blob = await canvasToBlob(canvas, 'image/jpeg', quality);
     }
 
-    // Last resort: shrink more
     if (blob.size > MAX_IMAGE_BYTES) {
       const shrink = Math.sqrt(MAX_IMAGE_BYTES / blob.size) * 0.9;
       canvas.width = Math.max(1, Math.round(width * shrink));
@@ -94,13 +98,15 @@ export async function prepareImageForUpload(file: File): Promise<File> {
       );
     }
 
-    const baseName = file.name.replace(/\.[^.]+$/, '') || 'timesheet';
+    const baseName =
+      options?.baseName ||
+      file.name.replace(/\.[^.]+$/, '') ||
+      'image';
     return new File([blob], `${baseName}.jpg`, {
       type: 'image/jpeg',
       lastModified: Date.now(),
     });
   } catch (err) {
-    // If compression fails but original is under limit, use original
     if (file.size <= MAX_IMAGE_BYTES) {
       return file;
     }
@@ -108,6 +114,14 @@ export async function prepareImageForUpload(file: File): Promise<File> {
       ? err
       : new Error('Gagal memproses gambar');
   }
+}
+
+/** Profile avatar: max 512px side, smaller file */
+export async function prepareProfileImageForUpload(file: File): Promise<File> {
+  return prepareImageForUpload(file, {
+    maxDimension: PROFILE_MAX_DIMENSION,
+    baseName: 'profile',
+  });
 }
 
 export type UploadProgress = {

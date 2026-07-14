@@ -1,17 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
-import { Camera, BarChart3, Clock, ChevronRight, FileText, LogOut } from "lucide-react";
-import { getStoredUser, clearStoredUser, AuthUser } from '@/lib/auth';
+import { Camera, BarChart3, Clock, ChevronRight, FileText, LogOut, User } from "lucide-react";
+import { getStoredUser, clearStoredUser, setStoredUser, AuthUser } from '@/lib/auth';
 import {
   formatDateMedium,
   formatWorkPeriodLabel,
   getActiveWorkPeriod,
   toLocalDateString,
 } from '@/lib/utils';
+import { resolveFotoUrl } from '@/lib/foto-url';
+import {
+  fetchWithRetry,
+  formatFileSize,
+  MAX_IMAGE_BYTES,
+  prepareProfileImageForUpload,
+} from '@/lib/image';
+
+function getInitials(nama: string | undefined | null): string {
+  if (!nama?.trim()) return '?';
+  const parts = nama.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 interface HMRecord {
   id: string;
@@ -25,6 +39,32 @@ export default function Dashboard() {
   const [records, setRecords] = useState<HMRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const profileInputRef = useRef<HTMLInputElement>(null);
+  const profileLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openProfilePicker = () => {
+    if (uploadingPhoto) return;
+    profileInputRef.current?.click();
+  };
+
+  const clearProfileLongPress = () => {
+    if (profileLongPressTimer.current) {
+      clearTimeout(profileLongPressTimer.current);
+      profileLongPressTimer.current = null;
+    }
+  };
+
+  const startProfileLongPress = () => {
+    clearProfileLongPress();
+    profileLongPressTimer.current = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(25);
+      }
+      openProfilePicker();
+    }, 500);
+  };
 
   useEffect(() => {
     const storedUser = getStoredUser();
@@ -39,6 +79,20 @@ export default function Dashboard() {
     }
     setUser(storedUser);
     fetchRecords(storedUser.id);
+    // Refresh fotoProfil from server (localStorage may be stale)
+    fetch(`/api/profile?employeeId=${storedUser.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const next: AuthUser = {
+          ...storedUser,
+          nama: data.nama || storedUser.nama,
+          fotoProfil: data.fotoProfil || null,
+        };
+        setUser(next);
+        setStoredUser(next);
+      })
+      .catch(() => {});
   }, [router]);
 
   const fetchRecords = async (employeeId: string) => {
@@ -74,18 +128,131 @@ export default function Dashboard() {
     return "Selamat Malam";
   };
 
+  const profileSrc = user?.fotoProfil ? resolveFotoUrl(user.fotoProfil) : '';
+
+  const handleProfilePhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user?.id) return;
+
+    setPhotoError(null);
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setPhotoError(
+        `Foto terlalu besar (${formatFileSize(file.size)}). Maksimal ${formatFileSize(MAX_IMAGE_BYTES)}.`
+      );
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const prepared = await prepareProfileImageForUpload(file);
+      const formData = new FormData();
+      formData.append('employeeId', user.id);
+      formData.append('file', prepared);
+
+      const res = await fetchWithRetry('/api/profile', {
+        method: 'POST',
+        body: formData,
+      }, { maxAttempts: 3 });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal upload foto');
+      }
+
+      const data = await res.json();
+      const next: AuthUser = {
+        ...user,
+        fotoProfil: data.fotoProfil || null,
+      };
+      setUser(next);
+      setStoredUser(next);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Gagal upload foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen pb-24">
       <div className="px-4 pt-5 pb-5 space-y-5 flex-1">
+        <input
+          ref={profileInputRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="hidden"
+          onChange={handleProfilePhoto}
+        />
+
         {/* Greeting Row */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[18px]  text-[var(--foreground)] leading-tight">{getGreeting()}</p>
-            <p className="text-lg font-bold uppercase">{user?.nama || 'User'}</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Profile avatar — double-tap or long-press to change (clean photo) */}
+            <button
+              type="button"
+              disabled={uploadingPhoto}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                openProfilePicker();
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                openProfilePicker();
+              }}
+              onTouchStart={startProfileLongPress}
+              onTouchEnd={clearProfileLongPress}
+              onTouchMove={clearProfileLongPress}
+              onTouchCancel={clearProfileLongPress}
+              onMouseDown={startProfileLongPress}
+              onMouseUp={clearProfileLongPress}
+              onMouseLeave={clearProfileLongPress}
+              className="relative w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm press-effect disabled:opacity-70 select-none"
+              style={{
+                background: profileSrc
+                  ? 'var(--muted-bg)'
+                  : 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)',
+              }}
+              aria-label="Ubah foto profil: tekan lama atau ketuk dua kali (maks. 5 MB)"
+              title="Tekan lama atau ketuk dua kali untuk ganti foto"
+            >
+              {profileSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profileSrc}
+                  alt={user?.nama || 'Profil'}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                />
+              ) : user?.nama ? (
+                <span className="text-[15px] font-bold text-white tracking-wide">
+                  {getInitials(user.nama)}
+                </span>
+              ) : (
+                <User className="w-6 h-6 text-white/90" />
+              )}
+              {uploadingPhoto && (
+                <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                </span>
+              )}
+            </button>
+            <div className="min-w-0">
+              <p className="text-[15px] text-[var(--muted)] leading-tight">{getGreeting()}</p>
+              <p className="text-[17px] font-bold uppercase text-[var(--foreground)] truncate">
+                {user?.nama || 'User'}
+              </p>
+              {photoError && (
+                <p className="text-[11px] text-[var(--error)] mt-0.5 truncate">{photoError}</p>
+              )}
+            </div>
           </div>
           <button
+            type="button"
             onClick={() => { clearStoredUser(); router.push('/login'); }}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-black/5 active:bg-black/10 transition-colors press-effect"
+            className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-black/5 active:bg-black/10 transition-colors press-effect"
             aria-label="Keluar"
           >
             <LogOut className="w-[18px] h-[18px] text-[var(--muted)]" />

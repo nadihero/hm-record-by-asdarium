@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resolveFotoUrl } from '@/lib/foto-url';
 
 const ADMIN_PIN = '70280';
 
@@ -7,6 +8,7 @@ interface AuthUser {
   id: string;
   nama: string;
   role: 'admin' | 'employee';
+  fotoProfil?: string | null;
 }
 
 async function validatePin(pin: string): Promise<AuthUser | null> {
@@ -16,6 +18,7 @@ async function validatePin(pin: string): Promise<AuthUser | null> {
       id: 'admin',
       nama: 'Administrator',
       role: 'admin',
+      fotoProfil: null,
     };
   }
 
@@ -29,6 +32,7 @@ async function validatePin(pin: string): Promise<AuthUser | null> {
       id: employee.id,
       nama: employee.nama,
       role: 'employee',
+      fotoProfil: resolveFotoUrl(employee.fotoProfil) || null,
     };
   }
 

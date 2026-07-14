@@ -4,6 +4,8 @@ export interface AuthUser {
   id: string;
   nama: string;
   role: 'admin' | 'employee';
+  /** Proxy path e.g. /api/uploads/profiles/xxx.jpg */
+  fotoProfil?: string | null;
 }
 
 export function isAdmin(user: AuthUser | null): boolean {

@@ -94,14 +94,17 @@ export function validateImageFile(file: File): void {
 }
 
 /**
- * Upload to R2. Stores proxy path in DB (stable, works without public bucket).
+ * Upload image to R2 under a folder prefix. Returns /api/uploads/{key} for DB.
  */
-export async function uploadTimesheetImage(file: File): Promise<string> {
+export async function uploadR2Image(
+  file: File,
+  folder: 'timesheets' | 'profiles' = 'timesheets'
+): Promise<string> {
   assertR2Configured();
   validateImageFile(file);
 
   const ext = safeExt(file.name, file.type);
-  const key = `timesheets/${uuidv4()}.${ext}`;
+  const key = `${folder}/${uuidv4()}.${ext}`;
   const body = Buffer.from(await file.arrayBuffer());
   const contentType = contentTypeForExt(ext);
 
@@ -116,8 +119,15 @@ export async function uploadTimesheetImage(file: File): Promise<string> {
     })
   );
 
-  // App proxy path — browser never needs public r2.dev access
   return `/api/uploads/${key}`;
+}
+
+export async function uploadTimesheetImage(file: File): Promise<string> {
+  return uploadR2Image(file, 'timesheets');
+}
+
+export async function uploadProfileImage(file: File): Promise<string> {
+  return uploadR2Image(file, 'profiles');
 }
 
 export async function deleteTimesheetImage(
@@ -132,7 +142,10 @@ export async function deleteTimesheetImage(
     const client = getR2Client();
     const keys = new Set([key]);
     const base = key.split('/').pop();
-    if (base) keys.add(`timesheets/${base}`);
+    if (base) {
+      keys.add(`timesheets/${base}`);
+      keys.add(`profiles/${base}`);
+    }
 
     for (const k of keys) {
       try {
@@ -150,6 +163,9 @@ export async function deleteTimesheetImage(
     console.error('R2 delete failed:', err);
   }
 }
+
+/** Alias for profile photo cleanup */
+export const deleteProfileImage = deleteTimesheetImage;
 
 export type StoredImage = {
   body: Buffer;

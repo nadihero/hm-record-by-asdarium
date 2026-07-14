@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from "@/components/BottomNav";
 import { ChevronLeft, ChevronRight, Image as ImageIcon, X, Clock, Pencil, Trash2, Check, Camera, ImagePlus } from "lucide-react";
-import Image from 'next/image';
 import { getStoredUser } from '@/lib/auth';
 import {
   formatDateDayMonth,
@@ -16,6 +15,7 @@ import {
   toDateOnlyString,
   toLocalDateString,
 } from '@/lib/utils';
+import { resolveFotoUrl } from '@/lib/foto-url';
 import { fetchWithRetry, prepareImageForUpload } from '@/lib/image';
 
 interface HMRecord {
@@ -176,7 +176,7 @@ export default function ReportPage() {
   };
 
   const currentFotoSrc = editPreview
-    || (!removeFoto && editRecord?.fotoPath ? editRecord.fotoPath : null);
+    || (!removeFoto && editRecord?.fotoPath ? resolveFotoUrl(editRecord.fotoPath) : null);
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -203,8 +203,9 @@ export default function ReportPage() {
       longPressFired.current = false;
       return;
     }
-    if (record.fotoPath) {
-      setSelectedImage(record.fotoPath);
+    const src = resolveFotoUrl(record.fotoPath);
+    if (src) {
+      setSelectedImage(src);
     }
   };
 
@@ -359,13 +360,13 @@ export default function ReportPage() {
                   {/* Thumbnail */}
                   <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-[var(--muted-bg)]">
                     {record.fotoPath ? (
-                      <Image
-                        src={record.fotoPath}
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={resolveFotoUrl(record.fotoPath)}
                         alt={`Timesheet ${formatDateDayMonth(record.tanggal)}`}
-                        width={56}
-                        height={56}
                         className="w-full h-full object-cover pointer-events-none"
                         draggable={false}
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

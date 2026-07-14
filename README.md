@@ -86,17 +86,34 @@ Open [http://localhost:3000](http://localhost:3000)
 ├── components/         # Reusable components
 ├── lib/                # Utilities & helpers
 ├── prisma/             # Database schema
-└── uploads/            # Uploaded images
 ```
 
 ## Environment Variables
 
+Salin `.env.example` → `.env` lalu isi nilai production.
+
 ```env
+# Database
 DATABASE_HOST=localhost
 DATABASE_USER=root
 DATABASE_PASSWORD=your_password
 DATABASE_NAME=hm_record
+DATABASE_URL=mysql://...
+
+# Cloudflare R2 — WAJIB (foto 100% di R2, tanpa disk lokal)
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
 ```
+
+### Storage foto (R2 only)
+
+- Semua upload timesheet → **Cloudflare R2** (`timesheets/<uuid>.jpg`).
+- Browser preview lewat **`/api/uploads/...`** (route Next.js → GetObject R2). Bukan folder disk.
+- Folder lokal `uploads/` **tidak dipakai** (boleh dihapus di VPS/lokal).
+- Env R2 wajib: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
 
 ## License
 

@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft, Clock, X, User } from 'lucide-react';
 import { getStoredUser, isAdmin } from '@/lib/auth';
 import { formatDateMedium } from '@/lib/utils';
+import { resolveFotoUrl } from '@/lib/foto-url';
 
 interface HMRecord {
   id: string;
@@ -100,16 +100,19 @@ export default function AdminRecordsPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => record.fotoPath && setSelectedImage(record.fotoPath)}
+                    onClick={() => {
+                      const src = resolveFotoUrl(record.fotoPath);
+                      if (src) setSelectedImage(src);
+                    }}
                     className="w-12 h-12 rounded-xl overflow-hidden bg-[var(--muted-bg)] flex-shrink-0 press-effect"
                   >
                     {record.fotoPath ? (
-                      <Image
-                        src={record.fotoPath}
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={resolveFotoUrl(record.fotoPath)}
                         alt="Timesheet"
-                        width={48}
-                        height={48}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -160,11 +163,10 @@ export default function AdminRecordsPage() {
           >
             <X className="w-5 h-5 text-white" />
           </button>
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={selectedImage}
             alt="Preview"
-            width={800}
-            height={600}
             className="max-w-full max-h-full object-contain rounded-2xl"
           />
         </div>

@@ -1,57 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir, unlink } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { parseDateOnly } from '@/lib/utils';
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
-
-async function deleteFotoFile(fotoPath: string | null | undefined) {
-  if (!fotoPath) return;
-  try {
-    const fileName = path.basename(fotoPath);
-    const candidates = [
-      path.join(process.cwd(), 'uploads', fileName),
-      path.join(process.cwd(), 'public', 'uploads', fileName),
-    ];
-    for (const filePath of candidates) {
-      try {
-        await unlink(filePath);
-        break;
-      } catch {
-        // try next location
-      }
-    }
-  } catch (fileError) {
-    console.error('Error deleting file:', fileError);
-  }
-}
-
-async function saveUploadedFile(file: File): Promise<string> {
-  if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error('FILE_TOO_LARGE');
-  }
-  if (file.type && !file.type.startsWith('image/') && file.type !== 'application/octet-stream') {
-    throw new Error('INVALID_FILE_TYPE');
-  }
-
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  if (!existsSync(uploadsDir)) {
-    await mkdir(uploadsDir, { recursive: true });
-  }
-
-  const rawExt = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const fileExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
-  const fileName = `${uuidv4()}.${fileExt === 'jpeg' ? 'jpg' : fileExt}`;
-  const filePath = path.join(uploadsDir, fileName);
-
-  const bytes = await file.arrayBuffer();
-  await writeFile(filePath, Buffer.from(bytes));
-
-  return `/api/uploads/${fileName}`;
-}
+import {
+  deleteTimesheetImage,
+  resolveFotoUrl,
+  uploadTimesheetImage,
+} from '@/lib/storage';
 
 export async function GET(
   request: NextRequest,
@@ -70,7 +24,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(record);
+    return NextResponse.json({
+      ...record,
+      fotoPath: resolveFotoUrl(record.fotoPath) || record.fotoPath,
+    });
   } catch (error) {
     console.error('Error fetching record:', error);
     return NextResponse.json(
@@ -131,8 +88,8 @@ export async function PUT(
 
     if (file) {
       try {
-        const newPath = await saveUploadedFile(file);
-        await deleteFotoFile(existing.fotoPath);
+        const newPath = await uploadTimesheetImage(file);
+        await deleteTimesheetImage(existing.fotoPath);
         data.fotoPath = newPath;
       } catch (e) {
         const msg = e instanceof Error ? e.message : '';
@@ -148,10 +105,20 @@ export async function PUT(
             { status: 400 }
           );
         }
-        throw e;
+        if (msg.startsWith('R2_NOT_CONFIGURED')) {
+          return NextResponse.json(
+            { error: 'Storage R2 belum dikonfigurasi. Periksa env R2_*.' },
+            { status: 503 }
+          );
+        }
+        console.error('Upload error:', e);
+        return NextResponse.json(
+          { error: 'Gagal mengunggah gambar ke R2' },
+          { status: 500 }
+        );
       }
     } else if (removeFoto) {
-      await deleteFotoFile(existing.fotoPath);
+      await deleteTimesheetImage(existing.fotoPath);
       data.fotoPath = '';
     }
 
@@ -160,7 +127,10 @@ export async function PUT(
       data,
     });
 
-    return NextResponse.json(record);
+    return NextResponse.json({
+      ...record,
+      fotoPath: resolveFotoUrl(record.fotoPath) || record.fotoPath,
+    });
   } catch (error) {
     console.error('Error updating record:', error);
     return NextResponse.json(
@@ -188,7 +158,7 @@ export async function DELETE(
       );
     }
 
-    await deleteFotoFile(record.fotoPath);
+    await deleteTimesheetImage(record.fotoPath);
 
     await prisma.hMRecord.delete({
       where: { id },
